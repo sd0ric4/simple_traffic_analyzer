@@ -9,7 +9,7 @@ capture_thread = None
 stop_event = threading.Event()
 pause_event = threading.Event()
 
-def capture_traffic(interface: str, duration: int) -> str:
+def capture_traffic(interface: str, duration: int, protocol: str) -> str:
     global capture_thread, stop_event, pause_event
     stop_event.clear()
     pause_event.set()  # 初始状态为非暂停
@@ -47,6 +47,14 @@ def capture_traffic(interface: str, duration: int) -> str:
     for proto, count in protocols.items():
         result += f"{proto}: {count}\n"
         print(f"{proto}: {count}")
+
+    # 详细解析选定的协议
+    if protocol in protocols:
+        result += f"\n详细解析 {protocol} 协议数据包：\n"
+        for packet in packets:
+            if packet.highest_layer == protocol:
+                result += f"{packet}\n"
+
     return result
 
 def stop_capture():
@@ -70,11 +78,13 @@ def get_interfaces():
     return netifaces.interfaces()
 
 iface_list = get_interfaces()
+protocol_list = ["HTTP", "TCP", "UDP", "IP", "Ethernet"]
 
 with gr.Blocks() as demo:
     gr.Markdown("# 简单流量分析工具")
     iface = gr.Dropdown(choices=iface_list, label="请选择网卡")
     duration = gr.Slider(minimum=1, maximum=60, value=10, label="抓取时长（秒）")
+    protocol = gr.Dropdown(choices=protocol_list, label="请选择协议")
     output = gr.Textbox(label="结果")
     
     with gr.Row():
@@ -83,7 +93,7 @@ with gr.Blocks() as demo:
         btn_pause = gr.Button("暂停抓取")
         btn_resume = gr.Button("恢复抓取")
 
-    btn_start.click(capture_traffic, inputs=[iface, duration], outputs=output)
+    btn_start.click(capture_traffic, inputs=[iface, duration, protocol], outputs=output)
     btn_stop.click(stop_capture, outputs=output)
     btn_pause.click(pause_capture, outputs=output)
     btn_resume.click(resume_capture, outputs=output)
