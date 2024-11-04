@@ -9,7 +9,7 @@ capture_thread = None
 stop_event = threading.Event()
 pause_event = threading.Event()
 
-def capture_traffic(interface, duration):
+def capture_traffic(interface: str, duration: int) -> str:
     global capture_thread, stop_event, pause_event
     stop_event.clear()
     pause_event.set()  # 初始状态为非暂停
@@ -17,7 +17,7 @@ def capture_traffic(interface, duration):
     capture = pyshark.LiveCapture(interface=interface)
     packets = []
 
-    def start_capture():
+    def start_capture(progress):
         start_time = time.time()
         while time.time() - start_time < duration:
             if stop_event.is_set():
@@ -25,10 +25,13 @@ def capture_traffic(interface, duration):
             if pause_event.is_set():
                 capture.sniff(packet_count=1)
                 packets.extend(capture._packets)
+                elapsed_time = time.time() - start_time
+                progress((elapsed_time / duration) * 100)
             else:
                 time.sleep(0.1)  # 暂停时稍作等待
 
-    capture_thread = threading.Thread(target=start_capture)
+    progress = gr.Progress(track_tqdm=True)
+    capture_thread = threading.Thread(target=start_capture, args=(progress,))
     capture_thread.start()
     capture_thread.join()
 
