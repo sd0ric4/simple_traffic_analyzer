@@ -3,19 +3,21 @@ import pyshark
 import threading
 import netifaces
 import time
-import polars as pl
+import pandas as pd
 from utils.pcap2csv import parse_pcap_to_csv
+import matplotlib.pyplot as plt
 
-df_http = pl.DataFrame()
-df_udp = pl.DataFrame()
-df_tcp = pl.DataFrame()
-df_ip = pl.DataFrame()
-df_ethernet = pl.DataFrame()
-df_summary = pl.DataFrame()
+df_http = pd.DataFrame()
+df_udp = pd.DataFrame()
+df_tcp = pd.DataFrame()
+df_ip = pd.DataFrame()
+df_ethernet = pd.DataFrame()
+df_summary = pd.DataFrame()
 # 全局变量用于控制抓包线程
 capture_thread = None
 stop_event = threading.Event()
 pause_event = threading.Event()
+
 def analyze_pcap(output_file):
     capture = pyshark.FileCapture(output_file, use_json=True)
     packets = [packet for packet in capture]
@@ -32,6 +34,7 @@ def analyze_pcap(output_file):
     
     print(result)
     return result
+
 def capture_traffic(interface, duration, outputfile):
     global capture_thread, stop_event, pause_event
     stop_event.clear()
@@ -52,13 +55,37 @@ def capture_traffic(interface, duration, outputfile):
     # 分析捕获的数据包
     result = analyze_pcap(outputfile)
     return result, outputfile
+
 def start_capture(interface, duration):
     output_file = f"capture_{int(time.time())}.pcap"
     result, file_path = capture_traffic(interface=interface, duration=duration, outputfile=output_file)
     return result, file_path
+
 def to_form(file):
     df_ethernet, df_ip, df_tcp, df_udp, df_http, df_summary = parse_pcap_to_csv(file, 'ethernet.csv', 'ip.csv', 'tcp.csv', 'udp.csv', 'http.csv', 'summary.csv')
-    return df_ethernet, df_ip, df_tcp, df_udp, df_http, df_summary
+    tmp_DataFrame = pd.read_csv('summary.csv') # 读取汇总数据
+    
+    protocol_counts = tmp_DataFrame['Protocol'].value_counts()
+    
+    # 打印调试信息
+    print(protocol_counts)
+    
+    # 使用matplotlib生成美观的饼状图
+    fig, ax = plt.subplots(figsize=(10, 6), dpi=1000)
+    colors = plt.cm.Paired(range(len(protocol_counts)))
+    wedges, texts, autotexts = ax.pie(
+        protocol_counts.values, 
+        labels=protocol_counts.index, 
+        autopct='%1.1f%%', 
+        startangle=140, 
+        colors=colors, 
+    )
+    ax.set_title("Protocol Distribution")
+    ax.legend(wedges, protocol_counts.index, title="Protocal", loc="center left", bbox_to_anchor=(1, 0, 0.5, 1))
+    plt.setp(autotexts, size=10, weight="bold", color="white")
+    
+    return df_ethernet, df_ip, df_tcp, df_udp, df_http, df_summary, fig
+
 def stop_capture():
     global stop_event
     stop_event.set()
@@ -78,12 +105,12 @@ def resume_capture():
 
 def get_interfaces():
     return netifaces.interfaces()
+
 def read_csv(file):
-    df = pl.read_csv(file.name)
+    df = pd.read_csv(file.name)
     return df
 
 iface_list = get_interfaces()
-
 
 with gr.Blocks() as demo:
     gr.Markdown("# 简单流量分析工具")
@@ -110,8 +137,9 @@ with gr.Blocks() as demo:
     df_udp_output = gr.Dataframe()
     df_http_output = gr.Dataframe()
     df_summary_output = gr.Dataframe()
-    btn_to_form.click(to_form, inputs=[download_link], outputs=[df_ethernet_output, df_ip_output, df_tcp_output, df_udp_output, df_http_output, df_summary_output])
+    gr.Markdown("### 协议分布")
+    protocol_pie_chart = gr.Plot()
+    btn_to_form.click(to_form, inputs=[download_link], outputs=[df_ethernet_output, df_ip_output, df_tcp_output, df_udp_output, df_http_output, df_summary_output, protocol_pie_chart])
 
 
-
-demo.launch()
+demo.launch(server_name="0.0.0.0", server_port=7878)
