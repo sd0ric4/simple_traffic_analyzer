@@ -23,7 +23,7 @@ def parse_pcap_to_csv(pcap_file, eth_csv, ip_csv, tcp_csv, udp_csv, http_csv, su
         ip_writer.writerow(['Seq', 'Timestamp', 'Version', 'Total Length', 'Identification', 'Flags', 'Fragment Offset', 'TTL', 'Protocol', 'Header Checksum', 'Src IP', 'Dest IP'])
         tcp_writer.writerow(['Seq', 'Timestamp', 'Src Port', 'Dest Port', 'Sequence', 'Acknowledgment', 'Flags', 'Window Size', 'Checksum', 'Urgent Pointer'])
         udp_writer.writerow(['Seq', 'Timestamp', 'Src Port', 'Dest Port', 'Length', 'Checksum'])
-        http_writer.writerow(['Seq', 'Timestamp', 'File Data'])
+        http_writer.writerow(['Seq', 'Timestamp', 'Request Method', 'Host', 'Path', 'User-Agent', 'File Data'])
         summary_writer.writerow(['No', 'Time', 'Source', 'Destination', 'Protocol', 'Length'])
         
         for seq, packet in enumerate(packets):
@@ -48,7 +48,7 @@ def parse_pcap_to_csv(pcap_file, eth_csv, ip_csv, tcp_csv, udp_csv, http_csv, su
             
             if hasattr(packet, 'http'):
                 http = packet.http
-                http_writer.writerow([seq, timestamp, getattr(http, 'file_data', 'N/A')])
+                http_writer.writerow([seq, timestamp, getattr(http, 'request_method', 'N/A'), getattr(http, 'host', 'N/A'), getattr(http, 'request_uri', 'N/A'), getattr(http, 'user_agent', 'N/A'), getattr(http, 'file_data', 'N/A')])
             
             proto = packet.highest_layer
             summary_writer.writerow([seq, timestamp, packet.ip.src if hasattr(packet, 'ip') else 'N/A', packet.ip.dst if hasattr(packet, 'ip') else 'N/A', proto, length])
